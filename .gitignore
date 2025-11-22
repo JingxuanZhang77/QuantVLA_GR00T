@@ -122,3 +122,10 @@ playground/
 demo_data/gr00t-gr1-apple-to-shelf/
 tmp/
 output/
+
+duquant*/
+rollout*/
+ohb_viz/
+smooth*/
+atm_viz*/
+ckpts*/

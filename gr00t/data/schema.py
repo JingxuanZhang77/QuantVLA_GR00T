@@ -16,6 +16,7 @@
 from enum import Enum
 from typing import Optional
 
+
 from numpydantic import NDArray
 from pydantic import BaseModel, Field, field_serializer
 

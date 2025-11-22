@@ -23,6 +23,7 @@ import torch
 from huggingface_hub import snapshot_download
 from huggingface_hub.errors import HFValidationError, RepositoryNotFoundError
 
+from gr00t.atm import ensure_dit_attention_patch, enable_dit_atm_if_configured
 from gr00t.data.dataset import ModalityConfig
 from gr00t.data.embodiment_tags import EmbodimentTag
 from gr00t.data.schema import DatasetMetadata
@@ -271,6 +272,29 @@ class Gr00tPolicy(BasePolicy):
             model.config.action_horizon = expected_action_horizon
             model.action_horizon = expected_action_horizon
             model.config.action_head_cfg["action_horizon"] = expected_action_horizon
+
+            print("[GR00T] Action head was recreated - will re-apply DuQuant if configured")
+
+        # Ensure DiT attention processors are ATM-aware before any quantization or scaling is applied
+        try:
+            ensure_dit_attention_patch(model)
+        except Exception as e:
+            print(f"[GR00T] Failed to patch attention for ATM support: {e}")
+
+        # Apply DuQuant W4A8 quantization if configured via environment variables
+        # This must be done BEFORE moving model to device
+        # IMPORTANT: This is called AFTER action_head recreation to ensure DiT layers are quantized
+        try:
+            from gr00t.quantization import enable_duquant_if_configured
+            enable_duquant_if_configured(model)
+        except Exception as e:
+            print(f"[GR00T] DuQuant not enabled or failed to apply: {e}")
+
+        # Apply ATM scaling if configured (uses pre-loaded alpha JSON)
+        try:
+            enable_dit_atm_if_configured(model)
+        except Exception as e:
+            print(f"[GR00T] ATM not enabled or failed to apply: {e}")
 
         model.to(device=self.device)  # type: ignore
 

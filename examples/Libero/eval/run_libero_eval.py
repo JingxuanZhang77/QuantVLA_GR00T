@@ -57,13 +57,17 @@ class GenerateConfig:
     #################################################################################################################
     task_suite_name: str = "libero_spatial"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
     num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
-    num_trials_per_task: int = 5                    # Number of rollouts per task
+    num_trials_per_task: int = 5                     # Number of rollouts per task
     #################################################################################################################
     # fmt: on
     """Port to connect to."""
     port: int = 5555
     """Headless mode (no GUI)."""
     headless: bool = False
+    """Run only the specified task indices (overrides order if provided)."""
+    task_ids: list[int] | None = None
+    """Run tasks in this explicit order."""
+    task_order: list[int] | None = None
 
 
 class GR00TPolicy:
@@ -149,9 +153,20 @@ def eval_libero(cfg: GenerateConfig) -> None:
     log_file = open(f"{log_dir}/libero_eval_{cfg.task_suite_name}.log", "w")
     log_file.write(f"Task suite: {cfg.task_suite_name}\n")
 
+    # Decide which task indices to run
+    if cfg.task_ids:
+        task_indices = cfg.task_ids
+    elif cfg.task_order:
+        task_indices = cfg.task_order
+    else:
+        task_indices = list(range(num_tasks_in_suite))
+
+    # Clamp indices to valid range and warn if needed
+    task_indices = [idx for idx in task_indices if 0 <= idx < num_tasks_in_suite]
+
     # Start evaluation
     total_episodes, total_successes = 0, 0
-    for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
+    for task_id in tqdm.tqdm(task_indices):
         # Get task
         task = task_suite.get_task(task_id)
 
@@ -165,7 +180,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
         # Start episodes
         task_episodes, task_successes = 0, 0
-        for episode_idx in tqdm.tqdm(range(cfg.num_trials_per_task)):
+        max_trials = min(cfg.num_trials_per_task, len(initial_states))
+        for episode_idx in tqdm.tqdm(range(max_trials)):
             print(f"\nTask: {task_description}")
             log_file.write(f"\nTask: {task_description}\n")
 
